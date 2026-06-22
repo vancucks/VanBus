@@ -15,18 +15,21 @@ type LoginScreenProps = {
 };
 
 export const LoginScreen = ({ onRegister }: LoginScreenProps) => {
-  const [email, setEmail] = useState('clara@vanbus.app');
-  const [password, setPassword] = useState('Vanbus1');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const login = useAuthStore((state) => state.login);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
 
-  const handleLogin = useCallback(() => {
-    const ok = login(email, password);
+  const handleLogin = useCallback(async () => {
+    setIsSubmitting(true);
+    const result = await login(email, password);
+    setIsSubmitting(false);
 
-    if (!ok) {
-      setError('E-mail ou senha inválidos.');
+    if (!result.ok) {
+      setError(result.message ?? 'E-mail ou senha invalidos.');
       return;
     }
 
@@ -46,7 +49,7 @@ export const LoginScreen = ({ onRegister }: LoginScreenProps) => {
             <Text style={[styles.logoText, { color: colors.text }]}>
               Van<Text style={{ color: colors.primary }}>Bus</Text>
             </Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>Catálogo de ônibus</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>Catalogo de onibus</Text>
           </View>
 
           <View style={styles.form}>
@@ -60,12 +63,12 @@ export const LoginScreen = ({ onRegister }: LoginScreenProps) => {
             />
             <Input icon="lock-closed-outline" onChangeText={setPassword} placeholder="Senha" secureTextEntry value={password} />
             {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
-            <Button title="Entrar" onPress={handleLogin} />
+            <Button title="Entrar" onPress={handleLogin} loading={isSubmitting} />
           </View>
 
           <Pressable onPress={onRegister} style={styles.registerLink}>
             <Text style={[styles.registerText, { color: colors.muted }]}>
-              Não tem uma conta? <Text style={{ color: colors.primary }}>Cadastre-se</Text>
+              Nao tem uma conta? <Text style={{ color: colors.primary }}>Cadastre-se</Text>
             </Text>
           </Pressable>
         </ScrollView>

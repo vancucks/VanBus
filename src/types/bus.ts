@@ -8,4 +8,16 @@ export type Bus = {
   userId: string;
   createdAt: string;
   updatedAt: string;
+  creatorName?: string;
+  creatorEmail?: string;
+};
+
+export type BusRow = {
+  id: string;
+  bus_number: string;
+  line_number: string;
+  status: BusStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 };

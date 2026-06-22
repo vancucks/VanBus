@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { useEffect, useMemo } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
 import { AuthNavigator } from './AuthNavigator';
 import { TabNavigator } from './TabNavigator';
@@ -9,15 +10,14 @@ import { getColors } from '../theme/colors';
 
 export const AppNavigator = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const isLoading = useAuthStore((state) => state.isLoading);
   const theme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
   const colors = getColors(theme);
 
   useEffect(() => {
-    if (currentUser?.theme) {
-      setTheme(currentUser.theme);
-    }
-  }, [currentUser?.id]);
+    initializeAuth();
+  }, [initializeAuth]);
 
   const navigationTheme: Theme = useMemo(
     () => ({
@@ -34,6 +34,14 @@ export const AppNavigator = () => {
     }),
     [colors, theme],
   );
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return <NavigationContainer theme={navigationTheme}>{currentUser ? <TabNavigator /> : <AuthNavigator />}</NavigationContainer>;
 };

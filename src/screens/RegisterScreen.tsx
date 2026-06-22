@@ -21,11 +21,12 @@ export const RegisterScreen = ({ onLogin }: RegisterScreenProps) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const registerUser = useAuthStore((state) => state.registerUser);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
 
-  const handleRegister = useCallback(() => {
+  const handleRegister = useCallback(async () => {
     const validationError = validateRegistration(name, email, password, confirmPassword);
 
     if (validationError) {
@@ -33,14 +34,20 @@ export const RegisterScreen = ({ onLogin }: RegisterScreenProps) => {
       return;
     }
 
-    const result = registerUser(name, email, password);
+    setIsSubmitting(true);
+    const result = await registerUser(name, email, password);
+    setIsSubmitting(false);
+
     if (!result.ok) {
       setError(result.message ?? 'Nao foi possivel cadastrar.');
+      if (result.message?.includes('Confirme')) {
+        onLogin();
+      }
       return;
     }
 
     setError('');
-  }, [confirmPassword, email, name, password, registerUser]);
+  }, [confirmPassword, email, name, onLogin, password, registerUser]);
 
   return (
     <ScreenContainer>
@@ -51,7 +58,7 @@ export const RegisterScreen = ({ onLogin }: RegisterScreenProps) => {
               <Ionicons name="bus" size={34} color="#FFFFFF" />
             </View>
             <Text style={[styles.title, { color: colors.text }]}>Criar conta</Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>Seu catalogo local da VanBus</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>Seu catalogo compartilhado da VanBus</Text>
           </View>
 
           <View style={styles.form}>
@@ -73,7 +80,7 @@ export const RegisterScreen = ({ onLogin }: RegisterScreenProps) => {
               value={confirmPassword}
             />
             {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
-            <Button title="Cadastrar" onPress={handleRegister} />
+            <Button title="Cadastrar" onPress={handleRegister} loading={isSubmitting} />
           </View>
 
           <Pressable onPress={onLogin} style={styles.loginLink}>

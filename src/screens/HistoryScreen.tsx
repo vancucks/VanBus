@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { BusCard } from '../components/BusCard';
 import { Button } from '../components/Button';
@@ -17,12 +18,21 @@ const statusOptions: (BusStatus | 'TODOS')[] = ['TODOS', 'AR_GELANDO', 'VENTANDO
 
 export const HistoryScreen = () => {
   const buses = useBusStore((state) => state.buses);
+  const fetchBuses = useBusStore((state) => state.fetchBuses);
+  const isLoading = useBusStore((state) => state.isLoading);
+  const error = useBusStore((state) => state.error);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
   const [draftStatus, setDraftStatus] = useState<BusStatus | 'TODOS'>('TODOS');
   const [draftLine, setDraftLine] = useState('');
   const [draftBus, setDraftBus] = useState('');
   const [filters, setFilters] = useState({ status: 'TODOS' as BusStatus | 'TODOS', lineNumber: '', busNumber: '' });
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBuses(filters);
+    }, [fetchBuses, filters]),
+  );
 
   const filteredBuses = useMemo(
     () =>
@@ -39,8 +49,10 @@ export const HistoryScreen = () => {
   );
 
   const applyFilters = useCallback(() => {
-    setFilters({ status: draftStatus, lineNumber: draftLine, busNumber: draftBus });
-  }, [draftBus, draftLine, draftStatus]);
+    const nextFilters = { status: draftStatus, lineNumber: draftLine, busNumber: draftBus };
+    setFilters(nextFilters);
+    fetchBuses(nextFilters);
+  }, [draftBus, draftLine, draftStatus, fetchBuses]);
 
   const renderItem = useCallback(({ item }: { item: Bus }) => <BusCard bus={item} variant="history" />, []);
 
@@ -51,6 +63,7 @@ export const HistoryScreen = () => {
         data={filteredBuses}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => fetchBuses(filters)} tintColor={colors.primary} />}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
@@ -59,6 +72,7 @@ export const HistoryScreen = () => {
             <View style={styles.heading}>
               <Text style={[styles.title, { color: colors.text }]}>Histórico</Text>
               <Text style={[styles.subtitle, { color: colors.muted }]}>Todos os ônibus cadastrados</Text>
+              {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
             </View>
 
             <View style={[styles.filterCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -113,6 +127,10 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  error: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   filterCard: {
     borderRadius: radius.lg,

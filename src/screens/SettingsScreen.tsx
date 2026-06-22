@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { BusCard } from '../components/BusCard';
 import { Button } from '../components/Button';
@@ -13,26 +14,33 @@ import { useThemeStore } from '../store/themeStore';
 import { getColors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
 import { Bus } from '../types/bus';
-import { validateRegistration } from '../utils/validators';
+import { isEmail, isRequired } from '../utils/validators';
 
 export const SettingsScreen = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const logout = useAuthStore((state) => state.logout);
   const buses = useBusStore((state) => state.buses);
+  const fetchBuses = useBusStore((state) => state.fetchBuses);
+  const isLoading = useBusStore((state) => state.isLoading);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
   const [name, setName] = useState(currentUser?.name ?? '');
   const [email, setEmail] = useState(currentUser?.email ?? '');
-  const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setName(currentUser?.name ?? '');
     setEmail(currentUser?.email ?? '');
-    setPassword('');
     setMessage('');
   }, [currentUser?.email, currentUser?.name]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBuses();
+    }, [fetchBuses]),
+  );
 
   const userBuses = useMemo(
     () =>
@@ -42,26 +50,24 @@ export const SettingsScreen = () => {
     [buses, currentUser?.id],
   );
 
-  const saveProfile = useCallback(() => {
+  const saveProfile = useCallback(async () => {
     if (!currentUser) {
       return;
     }
 
-    if (password.length > 0) {
-      const validationError = validateRegistration(name, email, password);
-      if (validationError) {
-        setMessage(validationError);
-        return;
-      }
+    if (!isRequired(name) || !isEmail(email)) {
+      setMessage(!isRequired(name) ? 'Nome obrigatorio.' : 'E-mail invalido.');
+      return;
     }
 
-    updateProfile({ name, email, password, theme });
-    setPassword('');
-    setMessage('Perfil atualizado.');
-  }, [currentUser, email, name, password, theme, updateProfile]);
+    setIsSaving(true);
+    const result = await updateProfile({ name, email, theme });
+    setIsSaving(false);
+    setMessage(result.ok ? 'Perfil atualizado.' : result.message ?? 'Nao foi possivel atualizar.');
+  }, [currentUser, email, name, theme, updateProfile]);
 
-  const handleLogout = useCallback(() => {
-    logout();
+  const handleLogout = useCallback(async () => {
+    await logout();
   }, [logout]);
 
   const renderItem = useCallback(({ item }: { item: Bus }) => <BusCard bus={item} variant="history" />, []);
@@ -73,6 +79,7 @@ export const SettingsScreen = () => {
         data={userBuses}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchBuses} tintColor={colors.primary} />}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
@@ -99,11 +106,10 @@ export const SettingsScreen = () => {
                 placeholder="E-mail"
                 value={email}
               />
-              <Input icon="lock-closed-outline" onChangeText={setPassword} placeholder="Nova senha" secureTextEntry value={password} />
               {message ? (
                 <Text style={[styles.message, { color: message.includes('atualizado') ? colors.primary : colors.error }]}>{message}</Text>
               ) : null}
-              <Button title="Salvar perfil" onPress={saveProfile} />
+              <Button title="Salvar perfil" onPress={saveProfile} loading={isSaving} />
               <Button title="Sair da conta" onPress={handleLogout} style={{ backgroundColor: colors.error }} />
             </View>
 

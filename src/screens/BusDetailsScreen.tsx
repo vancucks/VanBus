@@ -28,18 +28,17 @@ export const BusDetailsScreen = () => {
   const route = useRoute<BusDetailsRoute>();
   const navigation = useNavigation<BusDetailsNavigation>();
   const currentUser = useAuthStore((state) => state.currentUser);
-  const users = useAuthStore((state) => state.users);
   const buses = useBusStore((state) => state.buses);
   const updateBus = useBusStore((state) => state.updateBus);
   const deleteBus = useBusStore((state) => state.deleteBus);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
   const bus = useMemo(() => buses.find((item) => item.id === route.params.busId), [buses, route.params.busId]);
-  const creator = useMemo(() => users.find((user) => user.id === bus?.userId), [bus?.userId, users]);
   const [lineNumber, setLineNumber] = useState(bus?.lineNumber ?? '');
   const [status, setStatus] = useState<BusStatus | null>(bus?.status ?? null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -59,7 +58,7 @@ export const BusDetailsScreen = () => {
     setError('');
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!bus || !status) {
       setError('Registro nao encontrado.');
       return;
@@ -72,7 +71,9 @@ export const BusDetailsScreen = () => {
       return;
     }
 
-    updateBus(bus.id, { lineNumber, status });
+    setIsSubmitting(true);
+    await updateBus(bus.id, { lineNumber, status });
+    setIsSubmitting(false);
     setMessage('Alteracoes salvas.');
   }, [bus, lineNumber, status, updateBus]);
 
@@ -87,8 +88,8 @@ export const BusDetailsScreen = () => {
       {
         text: 'Apagar',
         style: 'destructive',
-        onPress: () => {
-          const deleted = deleteBus(bus.id, currentUser.id);
+        onPress: async () => {
+          const deleted = await deleteBus(bus.id, currentUser.id);
 
           if (!deleted) {
             setError('Apenas o criador pode apagar este registro.');
@@ -113,7 +114,7 @@ export const BusDetailsScreen = () => {
     );
   }
 
-  const creatorLabel = creator ? `${creator.name} (${creator.email})` : `Usuario ${bus.userId}`;
+  const creatorLabel = bus.creatorName ? `${bus.creatorName} (${bus.creatorEmail ?? 'sem e-mail'})` : `Usuario ${bus.userId}`;
   const canDelete = currentUser?.id === bus.userId;
 
   return (
@@ -173,7 +174,7 @@ export const BusDetailsScreen = () => {
 
             {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
             {message ? <Text style={[styles.message, { color: colors.primary }]}>{message}</Text> : null}
-            <Button title="Salvar alterações" onPress={handleSave} />
+            <Button title="Salvar alterações" onPress={handleSave} loading={isSubmitting} />
 
             {canDelete ? (
               <Pressable

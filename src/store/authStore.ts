@@ -1,115 +1,189 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { AppTheme, StoredUser, User } from '../types/user';
+import { hasSupabaseConfig, supabase } from '../services/supabase';
+import { AppTheme, User } from '../types/user';
+
+type AuthResult = {
+  ok: boolean;
+  message?: string;
+};
+
+type ProfileRow = {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+};
 
 type AuthState = {
   currentUser: User | null;
-  users: StoredUser[];
-  login: (email: string, password: string) => boolean;
-  registerUser: (name: string, email: string, password: string) => { ok: boolean; message?: string };
-  register: (name: string, email: string, password: string) => { ok: boolean; message?: string };
-  updateProfile: (data: { name: string; email: string; password?: string; theme?: AppTheme }) => void;
-  logout: () => void;
+  users: User[];
+  isLoading: boolean;
+  initializeAuth: () => Promise<void>;
+  loadProfiles: () => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  registerUser: (name: string, email: string, password: string) => Promise<AuthResult>;
+  register: (name: string, email: string, password: string) => Promise<AuthResult>;
+  updateProfile: (data: { name: string; email: string; password?: string; theme?: AppTheme }) => Promise<AuthResult>;
+  logout: () => Promise<void>;
 };
 
-const defaultUser: StoredUser = {
-  id: '1',
-  name: 'Clara',
-  email: 'clara@vanbus.app',
-  password: 'Vanbus1',
-  theme: 'dark',
-  createdAt: new Date().toISOString(),
-};
-
-const normalizeUser = (user: StoredUser): StoredUser => ({
-  ...user,
-  theme: user.theme ?? 'dark',
-  createdAt: user.createdAt ?? new Date().toISOString(),
+const mapProfile = (profile: ProfileRow, theme: AppTheme = 'dark'): User => ({
+  id: profile.id,
+  name: profile.name,
+  email: profile.email,
+  theme,
+  createdAt: profile.created_at,
 });
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      currentUser: null,
-      users: [defaultUser],
-      login: (email, password) => {
-        const foundUser = get().users.map(normalizeUser).find(
-          (user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password,
-        );
+const missingConfigMessage = 'Configure EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY.';
 
-        if (!foundUser) {
-          return false;
-        }
+const getProfile = async (userId: string, fallbackEmail = '') => {
+  const { data, error } = await supabase.from('profiles').select('id,name,email,created_at').eq('id', userId).maybeSingle();
 
-        set({ currentUser: foundUser });
-        return true;
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return {
+      id: userId,
+      name: fallbackEmail.split('@')[0] || 'Usuario',
+      email: fallbackEmail,
+      theme: 'dark' as AppTheme,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  return mapProfile(data as ProfileRow);
+};
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  currentUser: null,
+  users: [],
+  isLoading: true,
+  initializeAuth: async () => {
+    if (!hasSupabaseConfig) {
+      set({ currentUser: null, isLoading: false });
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    const sessionUser = data.session?.user;
+
+    if (!sessionUser) {
+      set({ currentUser: null, isLoading: false });
+      return;
+    }
+
+    const profile = await getProfile(sessionUser.id, sessionUser.email ?? '');
+    set({ currentUser: profile, isLoading: false });
+    await get().loadProfiles();
+  },
+  loadProfiles: async () => {
+    if (!hasSupabaseConfig) {
+      return;
+    }
+
+    const { data, error } = await supabase.from('profiles').select('id,name,email,created_at').order('created_at', { ascending: false });
+
+    if (error) {
+      return;
+    }
+
+    set({ users: (data ?? []).map((profile) => mapProfile(profile as ProfileRow)) });
+  },
+  login: async (email, password) => {
+    if (!hasSupabaseConfig) {
+      return { ok: false, message: missingConfigMessage };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error || !data.user) {
+      return { ok: false, message: error?.message ?? 'E-mail ou senha invalidos.' };
+    }
+
+    const profile = await getProfile(data.user.id, data.user.email ?? email);
+    set({ currentUser: profile });
+    await get().loadProfiles();
+    return { ok: true };
+  },
+  registerUser: async (name, email, password) => {
+    if (!hasSupabaseConfig) {
+      return { ok: false, message: missingConfigMessage };
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        data: { name: name.trim() },
       },
-      registerUser: (name, email, password) => {
-        const normalizedEmail = email.trim().toLowerCase();
-        const exists = get().users.some((user) => user.email.toLowerCase() === normalizedEmail);
+    });
 
-        if (exists) {
-          return { ok: false, message: 'Este e-mail ja esta cadastrado.' };
-        }
+    if (error || !data.user) {
+      return { ok: false, message: error?.message ?? 'Nao foi possivel cadastrar.' };
+    }
 
-        const newUser: StoredUser = {
-          id: String(Date.now()),
-          name: name.trim(),
-          email: normalizedEmail,
-          password,
-          theme: 'dark',
-          createdAt: new Date().toISOString(),
-        };
+    const profileRow = {
+      id: data.user.id,
+      name: name.trim(),
+      email: normalizedEmail,
+    };
 
-        set((state) => ({
-          users: [...state.users.map(normalizeUser), newUser],
-          currentUser: newUser,
-        }));
+    const { error: profileError } = await supabase.from('profiles').upsert(profileRow);
 
-        return { ok: true };
-      },
-      register: (...args) => get().registerUser(...args),
-      updateProfile: ({ name, email, password, theme }) => {
-        const currentUser = get().currentUser;
+    if (profileError && data.session) {
+      return { ok: false, message: profileError.message };
+    }
 
-        if (!currentUser) {
-          return;
-        }
+    if (!data.session) {
+      return { ok: false, message: 'Conta criada. Confirme o e-mail antes de entrar.' };
+    }
 
-        set((state) => {
-          const users = state.users.map(normalizeUser).map((user) => {
-            if (user.id !== currentUser.id) {
-              return user;
-            }
+    const profile = await getProfile(data.user.id, normalizedEmail);
+    set({ currentUser: profile });
+    await get().loadProfiles();
+    return { ok: true };
+  },
+  register: (...args) => get().registerUser(...args),
+  updateProfile: async ({ name, email }) => {
+    const currentUser = get().currentUser;
 
-            return {
-              ...user,
-              name: name.trim(),
-              email: email.trim().toLowerCase(),
-              password: password && password.length > 0 ? password : user.password,
-              theme: theme ?? user.theme,
-            };
-          });
+    if (!currentUser) {
+      return { ok: false, message: 'Entre na conta para atualizar o perfil.' };
+    }
 
-          const updatedStoredUser = users.find((user) => user.id === currentUser.id);
+    const profileRow = {
+      id: currentUser.id,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+    };
 
-          return {
-            users,
-            currentUser: updatedStoredUser ?? currentUser,
-          };
-        });
-      },
-      logout: () => set({ currentUser: null }),
-    }),
-    {
-      name: 'vanbus-auth',
-      storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({
-        users: state.users.map(normalizeUser),
-        currentUser: state.currentUser ? normalizeUser(state.currentUser) : null,
-      }),
-    },
-  ),
-);
+    const { data, error } = await supabase.from('profiles').update(profileRow).eq('id', currentUser.id).select('id,name,email,created_at').single();
+
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+
+    const updatedUser = mapProfile(data as ProfileRow, currentUser.theme);
+    set((state) => ({
+      currentUser: updatedUser,
+      users: state.users.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
+    }));
+
+    return { ok: true };
+  },
+  logout: async () => {
+    if (hasSupabaseConfig) {
+      await supabase.auth.signOut();
+    }
+
+    set({ currentUser: null });
+  },
+}));

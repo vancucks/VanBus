@@ -26,6 +26,7 @@ export const AddBusScreen = () => {
   const [lineNumber, setLineNumber] = useState('');
   const [status, setStatus] = useState<BusStatus | null>(null);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const currentUser = useAuthStore((state) => state.currentUser);
   const addBus = useBusStore((state) => state.addBus);
   const theme = useThemeStore((state) => state.theme);
@@ -37,7 +38,7 @@ export const AddBusScreen = () => {
     setError('');
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const validationError = validateBus(busNumber, lineNumber, status);
 
     if (validationError) {
@@ -50,12 +51,19 @@ export const AddBusScreen = () => {
       return;
     }
 
-    addBus({
+    setIsSubmitting(true);
+    const createdBus = await addBus({
       busNumber,
       lineNumber,
       status,
       userId: currentUser.id,
     });
+    setIsSubmitting(false);
+
+    if (!createdBus) {
+      setError('Nao foi possivel salvar o onibus.');
+      return;
+    }
 
     setBusNumber('');
     setLineNumber('');
@@ -100,7 +108,7 @@ export const AddBusScreen = () => {
             </View>
 
             {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
-            <Button title="Salvar ônibus" onPress={handleSave} />
+            <Button title="Salvar ônibus" onPress={handleSave} loading={isSubmitting} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
