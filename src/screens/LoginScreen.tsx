@@ -1,6 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -8,7 +7,7 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { getColors } from '../theme/colors';
-import { radius, spacing } from '../theme/spacing';
+import { spacing } from '../theme/spacing';
 
 type LoginScreenProps = {
   onRegister: () => void;
@@ -41,15 +40,11 @@ export const LoginScreen = ({ onRegister }: LoginScreenProps) => {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.brand}>
-            <View style={[styles.logoBox, { backgroundColor: `${colors.primary}22` }]}>
-              <View style={styles.logoInner}>
-                <Ionicons name="bus" size={44} color="#FFFFFF" />
-              </View>
-            </View>
+            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
             <Text style={[styles.logoText, { color: colors.text }]}>
               Van<Text style={{ color: colors.primary }}>Bus</Text>
             </Text>
-            <Text style={[styles.subtitle, { color: colors.muted }]}>Catalogo de onibus</Text>
+            <Text style={[styles.subtitle, { color: colors.muted }]}>Catálogo de ônibus</Text>
           </View>
 
           <View style={styles.form}>
@@ -91,20 +86,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  logoBox: {
-    width: 116,
-    height: 116,
-    borderRadius: radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoInner: {
-    width: 82,
-    height: 82,
-    borderRadius: 30,
-    backgroundColor: '#6C3CFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    width: 140,
+    height: 140,
   },
   logoText: {
     fontSize: 38,
