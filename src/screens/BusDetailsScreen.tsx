@@ -1,5 +1,6 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -12,6 +13,7 @@ import { StatusChip } from '../components/StatusChip';
 import { RootTabParamList } from '../navigation/TabNavigator';
 import { useAuthStore } from '../store/authStore';
 import { useBusStore } from '../store/busStore';
+import { useFavoriteStore } from '../store/favoriteStore';
 import { useThemeStore } from '../store/themeStore';
 import { getColors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
@@ -31,14 +33,20 @@ export const BusDetailsScreen = () => {
   const buses = useBusStore((state) => state.buses);
   const updateBus = useBusStore((state) => state.updateBus);
   const deleteBus = useBusStore((state) => state.deleteBus);
+  const loadFavorites = useFavoriteStore((state) => state.loadFavorites);
+  const favoriteBus = useFavoriteStore((state) => state.favoriteBus);
+  const unfavoriteBus = useFavoriteStore((state) => state.unfavoriteBus);
+  const isFavorite = useFavoriteStore((state) => state.isFavorite);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
   const bus = useMemo(() => buses.find((item) => item.id === route.params.busId), [buses, route.params.busId]);
+  const favorite = isFavorite(route.params.busId);
   const [lineNumber, setLineNumber] = useState(bus?.lineNumber ?? '');
   const [status, setStatus] = useState<BusStatus | null>(bus?.status ?? null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFavoriteSubmitting, setIsFavoriteSubmitting] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -53,10 +61,38 @@ export const BusDetailsScreen = () => {
     setMessage('');
   }, [bus?.id, bus?.lineNumber, bus?.status]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser) {
+        loadFavorites(currentUser.id);
+      }
+    }, [currentUser, loadFavorites]),
+  );
+
   const handleSelectStatus = useCallback((nextStatus: BusStatus) => {
     setStatus(nextStatus);
     setError('');
   }, []);
+
+  const handleToggleFavorite = useCallback(async () => {
+    if (!bus) {
+      setError('Registro nao encontrado.');
+      return;
+    }
+
+    setIsFavoriteSubmitting(true);
+    const result = favorite ? await unfavoriteBus(bus.id) : await favoriteBus(bus.id);
+    setIsFavoriteSubmitting(false);
+
+    if (!result.ok) {
+      setError(result.message ?? 'Nao foi possivel atualizar seus favoritos.');
+      setMessage('');
+      return;
+    }
+
+    setError('');
+    setMessage(favorite ? 'Onibus removido dos favoritos.' : 'Onibus adicionado aos favoritos.');
+  }, [bus, favorite, favoriteBus, unfavoriteBus]);
 
   const handleSave = useCallback(async () => {
     if (!bus || !status) {
@@ -137,6 +173,18 @@ export const BusDetailsScreen = () => {
                 <Text style={[styles.line, { color: colors.muted }]}>Linha {bus.lineNumber}</Text>
                 <StatusBadge status={bus.status} compact />
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                disabled={isFavoriteSubmitting}
+                onPress={handleToggleFavorite}
+                style={({ pressed }) => [
+                  styles.favoriteButton,
+                  { backgroundColor: `${colors.primary}18`, opacity: pressed || isFavoriteSubmitting ? 0.72 : 1 },
+                ]}
+              >
+                <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={26} color={favorite ? colors.error : colors.primary} />
+              </Pressable>
             </View>
 
             <View style={[styles.metaGrid, { borderColor: colors.border }]}>
@@ -255,6 +303,13 @@ const styles = StyleSheet.create({
   summaryText: {
     flex: 1,
     gap: 6,
+  },
+  favoriteButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   busNumber: {
     fontSize: 22,

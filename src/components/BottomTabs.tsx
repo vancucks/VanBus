@@ -11,6 +11,7 @@ const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Home: 'home',
   History: 'time',
   AddBus: 'add',
+  Rank: 'trophy',
   Settings: 'settings',
 };
 
@@ -18,7 +19,10 @@ export const BottomTabs = memo(({ state, descriptors, navigation }: BottomTabBar
   const theme = useThemeStore((store) => store.theme);
   const colors = getColors(theme);
 
-  const visibleRoutes = useMemo(() => state.routes.filter((route) => route.name !== 'BusDetails'), [state.routes]);
+  const visibleRoutes = useMemo(
+    () => state.routes.filter((route) => !['BusDetails', 'UserProfile'].includes(route.name)),
+    [state.routes],
+  );
 
   return (
     <View style={[styles.bar, { backgroundColor: colors.tab, borderColor: colors.border }]}>
