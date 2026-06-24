@@ -27,12 +27,12 @@ export const TabNavigator = () => (
     screenOptions={{ headerShown: false }}
     tabBar={(props) => <BottomTabs {...props} />}
   >
-    <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Inicio' }} />
-    <Tab.Screen name="History" component={HistoryScreen} options={{ tabBarLabel: 'Historico' }} />
+    <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Início' }} />
+    <Tab.Screen name="History" component={HistoryScreen} options={{ tabBarLabel: 'Histórico' }} />
     <Tab.Screen name="AddBus" component={AddBusScreen} options={{ tabBarLabel: 'Adicionar' }} />
     <Tab.Screen name="Rank" component={RankScreen} options={{ tabBarLabel: 'Rank' }} />
     <Tab.Screen name="BusDetails" component={BusDetailsScreen} options={{ tabBarButton: () => null, tabBarLabel: 'Detalhes' }} />
     <Tab.Screen name="UserProfile" component={UserProfileScreen} options={{ tabBarButton: () => null, tabBarLabel: 'Perfil' }} />
-    <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Configuracoes' }} />
+    <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Config' }} />
   </Tab.Navigator>
 );

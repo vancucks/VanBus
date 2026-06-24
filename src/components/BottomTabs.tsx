@@ -50,7 +50,9 @@ export const BottomTabs = memo(({ state, descriptors, navigation }: BottomTabBar
             <View style={isAddRoute ? [styles.addIcon, { backgroundColor: colors.primary }] : undefined}>
               <Ionicons name={icons[route.name]} size={isAddRoute ? 24 : 22} color={isAddRoute ? '#FFFFFF' : color} />
             </View>
-            <Text style={[styles.label, { color }]}>{label}</Text>
+            <Text numberOfLines={1} style={[styles.label, { color }]}>
+              {label}
+            </Text>
           </Pressable>
         );
       })}
@@ -89,5 +91,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '800',
+    textAlign: 'center',
   },
 });
