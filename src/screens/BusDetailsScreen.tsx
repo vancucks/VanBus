@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
+import { FeedbackInput } from '../components/FeedbackInput';
+import { FeedbackList } from '../components/FeedbackList';
 import { Header } from '../components/Header';
 import { Input } from '../components/Input';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -14,6 +16,7 @@ import { RootTabParamList } from '../navigation/TabNavigator';
 import { useAuthStore } from '../store/authStore';
 import { useBusStore } from '../store/busStore';
 import { useFavoriteStore } from '../store/favoriteStore';
+import { useFeedbackStore } from '../store/feedbackStore';
 import { useThemeStore } from '../store/themeStore';
 import { getColors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
@@ -37,6 +40,13 @@ export const BusDetailsScreen = () => {
   const favoriteBus = useFavoriteStore((state) => state.favoriteBus);
   const unfavoriteBus = useFavoriteStore((state) => state.unfavoriteBus);
   const isFavorite = useFavoriteStore((state) => state.isFavorite);
+  const feedbacks = useFeedbackStore((state) => state.feedbacks);
+  const feedbacksLoading = useFeedbackStore((state) => state.isLoading);
+  const feedbackSubmitting = useFeedbackStore((state) => state.isSubmitting);
+  const feedbackError = useFeedbackStore((state) => state.error);
+  const loadFeedbacks = useFeedbackStore((state) => state.loadFeedbacks);
+  const addFeedback = useFeedbackStore((state) => state.addFeedback);
+  const clearFeedbacks = useFeedbackStore((state) => state.clearFeedbacks);
   const theme = useThemeStore((state) => state.theme);
   const colors = getColors(theme);
   const bus = useMemo(() => buses.find((item) => item.id === route.params.busId), [buses, route.params.busId]);
@@ -67,6 +77,16 @@ export const BusDetailsScreen = () => {
         loadFavorites(currentUser.id);
       }
     }, [currentUser, loadFavorites]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser) {
+        loadFeedbacks(route.params.busId);
+      }
+
+      return () => clearFeedbacks();
+    }, [clearFeedbacks, currentUser, loadFeedbacks, route.params.busId]),
   );
 
   const handleSelectStatus = useCallback((nextStatus: BusStatus) => {
@@ -112,6 +132,24 @@ export const BusDetailsScreen = () => {
     setIsSubmitting(false);
     setMessage('Alteracoes salvas.');
   }, [bus, lineNumber, status, updateBus]);
+
+  const handleSubmitFeedback = useCallback(
+    async (text: string) => {
+      if (!bus) {
+        setError('Registro nao encontrado.');
+        return false;
+      }
+
+      const result = await addFeedback(bus.id, text);
+
+      if (!result.ok) {
+        return false;
+      }
+
+      return true;
+    },
+    [addFeedback, bus],
+  );
 
   const confirmDelete = useCallback(() => {
     if (!bus || !currentUser) {
@@ -232,6 +270,13 @@ export const BusDetailsScreen = () => {
                 <Text style={styles.deleteText}>Apagar registro</Text>
               </Pressable>
             ) : null}
+          </View>
+
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Feedbacks recentes</Text>
+            <FeedbackInput loading={feedbackSubmitting} onSubmit={handleSubmitFeedback} />
+            {feedbackError ? <Text style={[styles.error, { color: colors.error }]}>{feedbackError}</Text> : null}
+            <FeedbackList feedbacks={feedbacks} loading={feedbacksLoading} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
