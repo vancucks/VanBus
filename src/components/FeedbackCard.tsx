@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { NativeSyntheticEvent, Pressable, StyleSheet, Text, TextLayoutEventData, View } from 'react-native';
 
 import { useThemeStore } from '../store/themeStore';
@@ -17,14 +17,14 @@ export const FeedbackCard = memo(({ feedback }: FeedbackCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
 
-  const handleTextLayout = useCallback(
-    (event: NativeSyntheticEvent<TextLayoutEventData>) => {
-      if (!expanded) {
-        setCanExpand(event.nativeEvent.lines.length > 4);
-      }
-    },
-    [expanded],
-  );
+  useEffect(() => {
+    setExpanded(false);
+    setCanExpand(false);
+  }, [feedback.id, feedback.text]);
+
+  const handleFullTextLayout = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
+    setCanExpand(event.nativeEvent.lines.length > 4);
+  }, []);
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -34,10 +34,14 @@ export const FeedbackCard = memo(({ feedback }: FeedbackCardProps) => {
         </Text>
         <Text style={[styles.date, { color: colors.muted }]}>{relativeTime(feedback.createdAt)}</Text>
       </View>
+      <Text numberOfLines={expanded ? undefined : 4} style={[styles.text, { color: colors.text }]}>
+        {feedback.text}
+      </Text>
       <Text
-        numberOfLines={expanded ? undefined : 4}
-        onTextLayout={handleTextLayout}
-        style={[styles.text, { color: colors.text }]}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        onTextLayout={handleFullTextLayout}
+        style={[styles.text, styles.measureText]}
       >
         {feedback.text}
       </Text>
@@ -76,8 +80,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 21,
   },
+  measureText: {
+    left: spacing.md,
+    opacity: 0,
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md,
+    zIndex: -1,
+  },
   readMore: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
   },
 });
